@@ -107,7 +107,7 @@ final class ShowCommand extends AbstractCommand
         foreach ($sets as $set) {
             $filename = realpath($set);
             // resolve fallback for PHAR
-            if ($filename === false) {
+            if (!$filename) {
                 $filename = $set;
             }
             $this->symfonyStyle->writeln(' * ' . $filename);
