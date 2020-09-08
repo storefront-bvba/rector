@@ -45,6 +45,10 @@ jobs:
                             bin/rector sync-types
                             bin/rector check-static-type-mappers
 
+                    -
+                        name: 'Validate Monorepo'
+                        run: composer validate-monorepo
+
         name: ${{ matrix.actions.name }}
         runs-on: ubuntu-latest
 
