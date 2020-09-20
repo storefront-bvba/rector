@@ -4,20 +4,15 @@ declare(strict_types=1);
 
 namespace Rector\Naming\Rector\Property;
 
-use Nette\Utils\Strings;
 use PhpParser\Node;
-use PhpParser\Node\Expr\PropertyFetch;
-use PhpParser\Node\Identifier;
 use PhpParser\Node\Stmt\ClassLike;
-use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Property;
-use PhpParser\Node\Stmt\Return_;
-use PhpParser\Node\VarLikeIdentifier;
-use PHPStan\Type\BooleanType;
-use Rector\BetterPhpDocParser\PhpDocInfo\PhpDocInfo;
 use Rector\Core\Rector\AbstractRector;
 use Rector\Core\RectorDefinition\CodeSample;
 use Rector\Core\RectorDefinition\RectorDefinition;
+use Rector\Naming\Naming\ExpectedNameResolver;
+use Rector\Naming\PropertyRenamer;
+use Rector\Naming\ValueObject\PropertyRename;
 use Rector\NodeTypeResolver\Node\AttributeKey;
 
 /**
@@ -25,6 +20,22 @@ use Rector\NodeTypeResolver\Node\AttributeKey;
  */
 final class MakeBoolPropertyRespectIsHasWasMethodNamingRector extends AbstractRector
 {
+    /**
+     * @var PropertyRenamer
+     */
+    private $propertyRenamer;
+
+    /**
+     * @var ExpectedNameResolver
+     */
+    private $expectedNameResolver;
+
+    public function __construct(PropertyRenamer $propertyRenamer, ExpectedNameResolver $expectedNameResolver)
+    {
+        $this->propertyRenamer = $propertyRenamer;
+        $this->expectedNameResolver = $expectedNameResolver;
+    }
+
     public function getDefinition(): RectorDefinition
     {
         return new RectorDefinition('Renames property to respect is/has/was method naming', [
@@ -76,125 +87,32 @@ CODE_SAMPLE
             return null;
         }
 
-        $prefixedClassMethods = $this->getPrefixedClassMethods($node);
-        if ($prefixedClassMethods === []) {
-            return null;
-        }
-
+        ////////////////////////////////////////////////////////////////////////////////////////////////
+        /// Factory start
         $currentName = $this->getName($node);
-        $expectedName = $this->resolveExpectedName($prefixedClassMethods, $currentName);
+        $expectedName = $this->expectedNameResolver->resolveForProperty($node);
         if ($expectedName === null) {
             return null;
         }
 
-        if ($currentName === $expectedName) {
+        $objectType = $this->getObjectType($node);
+        /** @var ClassLike $classLike */
+        $classLike = $node->getAttribute(AttributeKey::CLASS_NODE);
+        $propertyRename = new PropertyRename($node, $expectedName, $currentName, $objectType, $classLike);
+        /// Factory finish
+        /////////////////////////////////////////////////////////////////////////////////////////////////
+        if ($this->propertyRenamer->rename($propertyRename) === null) {
             return null;
         }
-
-        $this->renameProperty($node, $currentName, $expectedName);
 
         return $node;
     }
 
     private function shouldSkip(Property $property): bool
     {
-        if (! $property->isPrivate()) {
+        if ($property->props[0]->default === null) {
             return true;
         }
-        return ! $this->skipNonBooleanType($property);
-    }
-
-    /**
-     * @return ClassMethod[]
-     */
-    private function getPrefixedClassMethods(Property $property): array
-    {
-        $name = $this->getName($property);
-        if ($name === null) {
-            return [];
-        }
-
-        $classLike = $property->getAttribute(AttributeKey::CLASS_NODE);
-        if ($classLike === null) {
-            return [];
-        }
-
-        $classMethods = $this->betterNodeFinder->findInstanceOf($classLike, ClassMethod::class);
-        return array_filter($classMethods, function (ClassMethod $classMethod): bool {
-            $classMethodName = $this->getName($classMethod);
-            return Strings::match($classMethodName, '#^(is|was|has)[A-Z].+#') !== null;
-        });
-    }
-
-    private function resolveExpectedName(array $classMethods, ?string $currentName): ?string
-    {
-        $classMethods = array_filter($classMethods, function (ClassMethod $classMethod) use ($currentName): bool {
-            $stmts = $classMethod->stmts;
-            if ($stmts === null) {
-                return false;
-            }
-
-            if (! array_key_exists(0, $stmts)) {
-                return false;
-            }
-
-            $return = $stmts[0];
-            if (! $return instanceof Return_) {
-                return false;
-            }
-
-            $node = $return->expr;
-            if ($node === null) {
-                return false;
-            }
-
-            return $this->isName($node, $currentName);
-        });
-
-        if (count($classMethods) !== 1) {
-            return null;
-        }
-
-        $classMethod = reset($classMethods);
-        return $this->getName($classMethod);
-    }
-
-    private function renameProperty(Property $property, string $currentName, string $expectedName): void
-    {
-        $classLike = $property->getAttribute(AttributeKey::CLASS_NODE);
-        if ($classLike === null) {
-            return;
-        }
-
-        $propertyProperty = $property->props[0];
-        $propertyProperty->name = new VarLikeIdentifier($expectedName);
-        $this->renamePropertyFetchesInClass($classLike, $currentName, $expectedName);
-    }
-
-    private function skipNonBooleanType(Property $property): bool
-    {
-        /** @var PhpDocInfo|null $phpDocInfo */
-        $phpDocInfo = $property->getAttribute(AttributeKey::PHP_DOC_INFO);
-        if ($phpDocInfo === null) {
-            return false;
-        }
-        return $phpDocInfo->getVarType() instanceof BooleanType;
-    }
-
-    private function renamePropertyFetchesInClass(ClassLike $classLike, string $oldName, string $expectedName): void
-    {
-        // 1. replace property fetch rename in whole class
-        $this->traverseNodesWithCallable([$classLike], function (Node $node) use (
-            $oldName,
-            $expectedName
-        ): ?PropertyFetch {
-            if (! $this->isLocalPropertyFetchNamed($node, $oldName)) {
-                return null;
-            }
-
-            /** @var PropertyFetch $node */
-            $node->name = new Identifier($expectedName);
-            return $node;
-        });
+        return ! ($this->isBooleanType($property) || $this->isBooleanType($property->props[0]->default));
     }
 }

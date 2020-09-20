@@ -2,12 +2,17 @@
 
 namespace Rector\Naming\Tests\Rector\Property\MakeBoolPropertyRespectIsHasWasMethodNamingRector\Fixture;
 
-class SkipProtectedProperty
+class SkipConflict
 {
     /**
      * @var bool
      */
-    protected $full = false;
+    public $isFull;
+
+    /**
+     * @var bool
+     */
+    private $full = false;
 
     public function isFull()
     {

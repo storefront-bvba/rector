@@ -47,6 +47,10 @@ final class PropertyRenamer
             return null;
         }
 
+        if ($this->areNamesDifferent($propertyRename)) {
+            return null;
+        }
+
         $onlyPropertyProperty = $propertyRename->getPropertyProperty();
         $onlyPropertyProperty->name = new VarLikeIdentifier($propertyRename->getExpectedName());
         $this->renamePropertyFetchesInClass($propertyRename);
@@ -69,5 +73,10 @@ final class PropertyRenamer
                 return $node;
             }
         );
+    }
+
+    private function areNamesDifferent(PropertyRename $propertyRename): bool
+    {
+        return $propertyRename->getCurrentName() === $propertyRename->getExpectedName();
     }
 }

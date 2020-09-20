@@ -2,9 +2,9 @@
 
 namespace Rector\Naming\Tests\Rector\Property\MakeBoolPropertyRespectIsHasWasMethodNamingRector\Fixture;
 
-class SkipNoDocblock
+class SkipNoDocblockAndDefaultValue
 {
-    private $full = false;
+    private $full;
 
     public function isFull()
     {

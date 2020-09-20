@@ -16,6 +16,7 @@ use PhpParser\Node\Stmt\Class_;
 use PHPStan\Analyser\Scope;
 use PHPStan\Type\Accessory\NonEmptyArrayType;
 use PHPStan\Type\ArrayType;
+use PHPStan\Type\BooleanType;
 use PHPStan\Type\FloatType;
 use PHPStan\Type\IntegerType;
 use PHPStan\Type\IntersectionType;
@@ -254,6 +255,11 @@ final class NodeTypeResolver
         }
 
         return false;
+    }
+
+    public function isBooleanType(Node $node): bool
+    {
+        return $this->isStaticType($node, BooleanType::class);
     }
 
     private function addNodeTypeResolver(NodeTypeResolverInterface $nodeTypeResolver): void
