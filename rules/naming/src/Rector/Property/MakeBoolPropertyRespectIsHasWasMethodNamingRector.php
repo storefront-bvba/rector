@@ -13,6 +13,7 @@ use Rector\Core\RectorDefinition\RectorDefinition;
 use Rector\Naming\Naming\ExpectedNameResolver;
 use Rector\Naming\PropertyRenamer;
 use Rector\Naming\ValueObject\PropertyRename;
+use Rector\Naming\ValueObjectFactory\PropertyRenameFactory;
 use Rector\NodeTypeResolver\Node\AttributeKey;
 
 /**
@@ -30,10 +31,19 @@ final class MakeBoolPropertyRespectIsHasWasMethodNamingRector extends AbstractRe
      */
     private $expectedNameResolver;
 
-    public function __construct(PropertyRenamer $propertyRenamer, ExpectedNameResolver $expectedNameResolver)
-    {
+    /**
+     * @var PropertyRenameFactory
+     */
+    private $propertyRenameFactory;
+
+    public function __construct(
+        PropertyRenamer $propertyRenamer,
+        ExpectedNameResolver $expectedNameResolver,
+        PropertyRenameFactory $propertyRenameFactory
+    ) {
         $this->propertyRenamer = $propertyRenamer;
         $this->expectedNameResolver = $expectedNameResolver;
+        $this->propertyRenameFactory = $propertyRenameFactory;
     }
 
     public function getDefinition(): RectorDefinition
@@ -87,20 +97,11 @@ CODE_SAMPLE
             return null;
         }
 
-        ////////////////////////////////////////////////////////////////////////////////////////////////
-        /// Factory start
-        $currentName = $this->getName($node);
-        $expectedName = $this->expectedNameResolver->resolveForProperty($node);
-        if ($expectedName === null) {
+        $propertyRename = $this->propertyRenameFactory->create($node);
+        if ($propertyRename === null) {
             return null;
         }
 
-        $objectType = $this->getObjectType($node);
-        /** @var ClassLike $classLike */
-        $classLike = $node->getAttribute(AttributeKey::CLASS_NODE);
-        $propertyRename = new PropertyRename($node, $expectedName, $currentName, $objectType, $classLike);
-        /// Factory finish
-        /////////////////////////////////////////////////////////////////////////////////////////////////
         if ($this->propertyRenamer->rename($propertyRename) === null) {
             return null;
         }
